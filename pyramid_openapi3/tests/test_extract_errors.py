@@ -408,6 +408,67 @@ class BadRequestsTests(unittest.TestCase):
             },
         ]
 
+    def test_multiple_schema_errors(self) -> None:
+        """Render error when no schema matches."""
+        endpoints = """
+          /foo:
+            post:
+              requestBody:
+                required: true
+                description: Data Animals
+                content:
+                  application/json:
+                    schema:
+                      $ref: "#/components/schemas/Animals"
+              responses:
+                200:
+                  description: Say hello
+                400:
+                  description: Bad Request
+        components:
+          schemas:
+            Animals:
+              type: array
+              anyOf:
+                - $ref: "#/components/schemas/Dog"
+                - $ref: "#/components/schemas/Cat"
+              discriminator:
+                propertyName: animal
+                mapping:
+                  Dog: "#/components/schemas/Dog"
+                  Cat: "#/components/schemas/Cat"
+            Animal:
+              required:
+                - "name"
+              properties:
+                name:
+                  type: "string"
+            Dog:
+              allOf:
+                - $ref: "#/components/schemas/Animal"
+                - type: object
+                  required:
+                    - "breed"
+                  properties:
+                    breed:
+                      type: "string"
+                      example: "Mix"
+            Cat:
+              allOf:
+                - $ref: "#/components/schemas/Animal"
+                - type: object
+                  required:
+                    - "family"
+                  properties:
+                    family:
+                      type: "string"
+                      example: "Tiger"
+        """
+        res = self._testapp(view=self.foo, endpoints=endpoints).post_json(
+            "/foo", [{"animal": "Dog", "name": "Mix"}, {"animal": "Cat"}], status=400
+        )
+        assert res.json == []
+
     def test_bad_JWT_token(self) -> None:
         """Render 401 on bad JWT token."""
         endpoints = """
